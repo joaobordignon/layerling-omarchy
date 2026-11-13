@@ -233,7 +233,10 @@ int run(int argc, char *argv[], QString *openUrl) {
         return 0;
     }
 
-    // Everything below runs without a display.
+    // Everything below runs without a display. The app that `mcp` starts
+    // must still get one, so its children see the original setting.
+    const QByteArray platform = qgetenv("QT_QPA_PLATFORM");
+    const bool hadPlatform = qEnvironmentVariableIsSet("QT_QPA_PLATFORM");
     qputenv("QT_QPA_PLATFORM", "offscreen");
     QCoreApplication app(argc, argv);
     QCoreApplication::setApplicationVersion(LAYERLING_APP_VERSION);
@@ -242,8 +245,13 @@ int run(int argc, char *argv[], QString *openUrl) {
         printf("layerling %s\n", LAYERLING_APP_VERSION);
         return 0;
     }
-    if (arguments == QStringList{"mcp"})
+    if (arguments == QStringList{"mcp"}) {
+        if (hadPlatform)
+            qputenv("QT_QPA_PLATFORM", platform);
+        else
+            qunsetenv("QT_QPA_PLATFORM");
         return mcp();
+    }
     if (arguments == QStringList{"skill", "install"})
         return skillInstall(json);
 
