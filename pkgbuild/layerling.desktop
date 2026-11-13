@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Name=layerling
+Comment=Easy 3D CAD for 3D printing
+Comment[ar]=تصميم ثلاثي الأبعاد سهل للطباعة ثلاثية الأبعاد
+Comment[de]=Einfaches 3D-CAD für den 3D-Druck
+Comment[es]=CAD 3D sencillo para impresión 3D
+Comment[ja]=3D プリント向けのかんたん 3D CAD
+Comment[nl]=Eenvoudig 3D-CAD voor 3D-printen
+Comment[pl]=Prosty CAD 3D do druku 3D
+Comment[sv]=Enkel 3D-CAD för 3D-utskrift
+Comment[zh_CN]=面向 3D 打印的简易 3D CAD
+Comment[zh_TW]=適用於 3D 列印的簡易 3D CAD
+Exec=layerling
+Icon=layerling
+Terminal=false
+Categories=Graphics;3DGraphics;Engineering;
+Keywords=CAD;3D;STL;STEP;3MF;printing;Tinkercad;
+StartupWMClass=layerling

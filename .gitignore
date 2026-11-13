@@ -1,0 +1,6 @@
+/build/
+/build-runtime.log
+/pkgbuild/pkg/
+/pkgbuild/src/
+/pkgbuild/*.tar.gz
+*.pkg.tar.*

@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+mkdir -p "$ROOT/build"
+cd "$ROOT/build"
+
+qmake6 "$ROOT/layerling.pro"
+make -j"$(nproc)"
+
+echo "Built $ROOT/build/layerling"
+[ -f "$ROOT/build/runtime/apps/web/server.js" ] || echo "Run bin/runtime once to build the layerling server it runs."

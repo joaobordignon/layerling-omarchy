@@ -1,0 +1,20 @@
+{
+  "Starting layerling…": "layerling を起動しています…",
+  "layerling could not start": "layerling を起動できませんでした",
+  "Try again": "再試行",
+  "Node.js could not be started: %1": "Node.js を起動できませんでした: %1",
+  "The layerling server stopped (exit code %1).": "layerling サーバーが停止しました (終了コード %1)。",
+  "Another program is using port %1.": "別のプログラムがポート %1 を使用しています。",
+  "Node.js was not found. Install the nodejs package.": "Node.js が見つかりません。nodejs パッケージをインストールしてください。",
+  "The layerling server files were not found in %1.": "%1 に layerling サーバーのファイルが見つかりません。",
+  "The layerling data folder could not be prepared: %1": "layerling のデータフォルダーを準備できませんでした: %1",
+  "Open": "開く",
+  "Save %1": "%1 を保存",
+  "The file chooser is not available: %1": "ファイル選択ダイアログを使用できません: %1",
+  "Saved %1": "%1 を保存しました",
+  "The file chooser is not available, so %1 was saved to %2.": "ファイル選択ダイアログを使用できないため、%1 を %2 に保存しました。",
+  "Could not save %1: %2": "%1 を保存できませんでした: %2",
+  "The layerling server did not answer within %n seconds.": {
+    "other": "layerling サーバーが %n 秒以内に応答しませんでした。"
+  }
+}

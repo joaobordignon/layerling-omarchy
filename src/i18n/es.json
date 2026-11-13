@@ -1,0 +1,21 @@
+{
+  "Starting layerling…": "Iniciando layerling…",
+  "layerling could not start": "layerling no pudo iniciarse",
+  "Try again": "Reintentar",
+  "Node.js could not be started: %1": "No se pudo iniciar Node.js: %1",
+  "The layerling server stopped (exit code %1).": "El servidor de layerling se detuvo (código de salida %1).",
+  "Another program is using port %1.": "Otro programa está usando el puerto %1.",
+  "Node.js was not found. Install the nodejs package.": "No se encontró Node.js. Instala el paquete nodejs.",
+  "The layerling server files were not found in %1.": "No se encontraron los archivos del servidor de layerling en %1.",
+  "The layerling data folder could not be prepared: %1": "No se pudo preparar la carpeta de datos de layerling: %1",
+  "Open": "Abrir",
+  "Save %1": "Guardar %1",
+  "The file chooser is not available: %1": "El selector de archivos no está disponible: %1",
+  "Saved %1": "%1 guardado",
+  "The file chooser is not available, so %1 was saved to %2.": "El selector de archivos no está disponible, así que %1 se guardó en %2.",
+  "Could not save %1: %2": "No se pudo guardar %1: %2",
+  "The layerling server did not answer within %n seconds.": {
+    "one": "El servidor de layerling no respondió en %n segundo.",
+    "other": "El servidor de layerling no respondió en %n segundos."
+  }
+}

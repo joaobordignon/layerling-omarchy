@@ -1,0 +1,25 @@
+{
+  "Starting layerling…": "جارٍ تشغيل layerling…",
+  "layerling could not start": "تعذّر تشغيل layerling",
+  "Try again": "حاول مرة أخرى",
+  "Node.js could not be started: %1": "تعذّر تشغيل Node.js: ‏%1",
+  "The layerling server stopped (exit code %1).": "توقف خادم layerling (رمز الخروج %1).",
+  "Another program is using port %1.": "برنامج آخر يستخدم المنفذ %1.",
+  "Node.js was not found. Install the nodejs package.": "لم يُعثر على Node.js. ثبّت الحزمة nodejs.",
+  "The layerling server files were not found in %1.": "لم يُعثر على ملفات خادم layerling في %1.",
+  "The layerling data folder could not be prepared: %1": "تعذّر تجهيز مجلد بيانات layerling: ‏%1",
+  "Open": "فتح",
+  "Save %1": "حفظ %1",
+  "The file chooser is not available: %1": "منتقي الملفات غير متاح: ‏%1",
+  "Saved %1": "تم حفظ %1",
+  "The file chooser is not available, so %1 was saved to %2.": "منتقي الملفات غير متاح، لذا حُفظ %1 في %2.",
+  "Could not save %1: %2": "تعذّر حفظ %1: ‏%2",
+  "The layerling server did not answer within %n seconds.": {
+    "zero": "لم يستجب خادم layerling خلال %n ثانية.",
+    "one": "لم يستجب خادم layerling خلال ثانية واحدة.",
+    "two": "لم يستجب خادم layerling خلال ثانيتين.",
+    "few": "لم يستجب خادم layerling خلال %n ثوانٍ.",
+    "many": "لم يستجب خادم layerling خلال %n ثانية.",
+    "other": "لم يستجب خادم layerling خلال %n ثانية."
+  }
+}

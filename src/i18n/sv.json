@@ -1,0 +1,21 @@
+{
+  "Starting layerling…": "Startar layerling…",
+  "layerling could not start": "layerling kunde inte starta",
+  "Try again": "Försök igen",
+  "Node.js could not be started: %1": "Node.js kunde inte startas: %1",
+  "The layerling server stopped (exit code %1).": "layerling-servern stoppades (slutkod %1).",
+  "Another program is using port %1.": "Ett annat program använder port %1.",
+  "Node.js was not found. Install the nodejs package.": "Node.js hittades inte. Installera paketet nodejs.",
+  "The layerling server files were not found in %1.": "layerling-serverns filer hittades inte i %1.",
+  "The layerling data folder could not be prepared: %1": "layerlings datamapp kunde inte förberedas: %1",
+  "Open": "Öppna",
+  "Save %1": "Spara %1",
+  "The file chooser is not available: %1": "Filväljaren är inte tillgänglig: %1",
+  "Saved %1": "%1 sparades",
+  "The file chooser is not available, so %1 was saved to %2.": "Filväljaren är inte tillgänglig, så %1 sparades i %2.",
+  "Could not save %1: %2": "Kunde inte spara %1: %2",
+  "The layerling server did not answer within %n seconds.": {
+    "one": "layerling-servern svarade inte inom %n sekund.",
+    "other": "layerling-servern svarade inte inom %n sekunder."
+  }
+}

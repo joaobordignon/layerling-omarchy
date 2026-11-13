@@ -1,0 +1,30 @@
+pkgname=layerling
+pkgver=1.162.0
+pkgrel=1
+pkgdesc='Easy 3D CAD for 3D printing, as an Omarchy app'
+arch=('x86_64' 'aarch64')
+url='https://github.com/henmedia/layerling'
+license=('AGPL-3.0-only' 'MIT')
+depends=('nodejs' 'qt6-base' 'qt6-declarative' 'qt6-webengine' 'qt6-wayland' 'xdg-desktop-portal')
+makedepends=('npm' 'gcc' 'make')
+options=('!debug')
+source=("layerling-$pkgver.tar.gz::https://github.com/henmedia/layerling/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('7044c2d7be81653940f8b646d46f51680d58cb952002219dfb785154de814282')
+
+build() {
+  # The layerling server, built from the release, then the window around it.
+  "$startdir/../bin/runtime" "$srcdir/layerling-$pkgver" "$srcdir/runtime"
+  cd "$startdir/.."
+  ./bin/build
+}
+
+package() {
+  install -d "$pkgdir/usr/lib"
+  cp -a "$srcdir/runtime" "$pkgdir/usr/lib/layerling"
+  cd "$startdir/.."
+  install -Dm755 build/layerling "$pkgdir/usr/bin/layerling"
+  install -Dm644 "$srcdir/runtime/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/AGPL-3.0"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 "$startdir/layerling.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/layerling.svg"
+  install -Dm644 "$startdir/layerling.desktop" "$pkgdir/usr/share/applications/layerling.desktop"
+}

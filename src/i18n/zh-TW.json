@@ -1,0 +1,20 @@
+{
+  "Starting layerling…": "正在啟動 layerling…",
+  "layerling could not start": "layerling 無法啟動",
+  "Try again": "重試",
+  "Node.js could not be started: %1": "無法啟動 Node.js：%1",
+  "The layerling server stopped (exit code %1).": "layerling 伺服器已停止（結束代碼 %1）。",
+  "Another program is using port %1.": "另一個程式正在使用連接埠 %1。",
+  "Node.js was not found. Install the nodejs package.": "找不到 Node.js。請安裝 nodejs 套件。",
+  "The layerling server files were not found in %1.": "在 %1 中找不到 layerling 伺服器檔案。",
+  "The layerling data folder could not be prepared: %1": "無法準備 layerling 資料夾：%1",
+  "Open": "開啟",
+  "Save %1": "儲存 %1",
+  "The file chooser is not available: %1": "檔案選擇器無法使用：%1",
+  "Saved %1": "已儲存 %1",
+  "The file chooser is not available, so %1 was saved to %2.": "檔案選擇器無法使用，因此 %1 已儲存到 %2。",
+  "Could not save %1: %2": "無法儲存 %1：%2",
+  "The layerling server did not answer within %n seconds.": {
+    "other": "layerling 伺服器在 %n 秒內沒有回應。"
+  }
+}

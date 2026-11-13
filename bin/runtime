@@ -1,0 +1,50 @@
+#!/bin/sh
+# Builds layerling's Node server from upstream source and lays it out the way
+# the upstream Dockerfile does, so the app can run it with plain `node`.
+#
+#   bin/runtime                     fetch the release pinned in pkgbuild/PKGBUILD
+#                                   and build it into build/runtime
+#   bin/runtime <source> <output>   build an unpacked source tree (used by PKGBUILD)
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+
+if [ $# -eq 0 ]; then
+  version="$(sed -n 's/^pkgver=//p' "$ROOT/pkgbuild/PKGBUILD")"
+  source="$ROOT/build/upstream/layerling-$version"
+  if [ ! -d "$source" ]; then
+    mkdir -p "$ROOT/build/upstream"
+    curl -fsSL "https://github.com/henmedia/layerling/archive/refs/tags/v$version.tar.gz" \
+      | tar -xz -C "$ROOT/build/upstream"
+  fi
+  set -- "$source" "$ROOT/build/runtime"
+fi
+
+source="$(CDPATH= cd -- "$1" && pwd)"
+output="$2"
+
+cd "$source"
+export NEXT_TELEMETRY_DISABLED=1 NODE_ENV=production LAYERLING_STANDALONE=true
+npm ci --include=dev --no-audit --no-fund
+npm run build
+
+rm -rf "$output"
+mkdir -p "$output"
+cp -a apps/web/.next/standalone/. "$output/"
+cp -a apps/web/.next/static "$output/apps/web/.next/static"
+cp -a apps/web/public "$output/apps/web/public"
+# Left out for the same reasons as upstream's Dockerfile: sharp only serves the
+# image optimizer (switched off), typescript and the sources only matter to the
+# build, and the bundler's copy of the CAD kernel is never requested.
+rm -rf "$output/node_modules/sharp" "$output/node_modules/@img" \
+  "$output/node_modules/typescript" "$output/apps/web/src"
+rm -f "$output"/apps/web/.next/static/media/occt-wasm.*.wasm
+find "$output/node_modules" \( -name '*.map' -o -name '*.d.ts' \) -type f -delete
+
+# The MCP bridge script and the agent skill have no dependencies beyond Node.
+mkdir -p "$output/mcp"
+cp scripts/layerling-mcp-*.mjs "$output/mcp/"
+cp -a docs/skills/layerling-mcp-skill "$output/skill"
+cp LICENSE "$output/LICENSE"
+
+echo "Built layerling runtime into $output"

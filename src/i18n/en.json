@@ -1,0 +1,6 @@
+{
+  "The layerling server did not answer within %n seconds.": {
+    "one": "The layerling server did not answer within %n second.",
+    "other": "The layerling server did not answer within %n seconds."
+  }
+}
