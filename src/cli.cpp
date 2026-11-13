@@ -11,6 +11,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSaveFile>
+#include <QUrl>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -31,6 +32,50 @@ static const char *usage =
     "\n"
     "Register the MCP server with Claude Code once:\n"
     "  claude mcp add --scope user layerling -- layerling mcp\n";
+
+// Loaded before the bridge script (node --import). Only a failed connection
+// to the app's own address starts the app; timeouts and other errors, and any
+// other address, pass through unchanged.
+static const char *appLaunchModule = R"js(// Written by `layerling mcp`: starts the layerling app when a tool call finds it closed.
+import { spawn } from "node:child_process";
+
+const base = process.env.LAYERLING_URL;
+const app = process.env.LAYERLING_APP;
+const originalFetch = globalThis.fetch;
+let starting = null;
+
+async function answers() {
+  try {
+    await originalFetch(base + "/", { signal: AbortSignal.timeout(1500) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function startApp() {
+  spawn(app, ["open"], { stdio: "ignore", detached: true }).unref();
+  for (let i = 0; i < 120; i++) {
+    if (await answers()) return;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
+
+globalThis.fetch = async (input, init = {}) => {
+  try {
+    return await originalFetch(input, init);
+  } catch (error) {
+    const url = String(input instanceof Request ? input.url : input);
+    if (!base || !app || !url.startsWith(base) || error?.name === "TimeoutError" || error?.name === "AbortError") {
+      throw error;
+    }
+    starting ??= startApp().finally(() => { starting = null; });
+    await starting;
+    // The call's own timeout ran while the app started: give the retry a new one.
+    return originalFetch(input, { ...init, signal: AbortSignal.timeout(15000) });
+  }
+};
+)js";
 
 static int mcp() {
     const QString runtime = Paths::runtimeDirectory();
@@ -67,14 +112,32 @@ static int mcp() {
     }
     QFile::setPermissions(shim.fileName(), QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
 
+    // The bridge script gives up when the app's server does not answer. An
+    // MCP client starts this command with every session, so opening the
+    // window here would pop it up each time; instead a preload starts the app
+    // the first time a tool call finds it closed, and retries that call.
+    QSaveFile launcher(shimDirectory + "/app-launch.mjs");
+    if (!launcher.open(QIODevice::WriteOnly)) {
+        fprintf(stderr, "layerling: cannot write %s\n", qPrintable(launcher.fileName()));
+        return 1;
+    }
+    launcher.write(appLaunchModule);
+    if (!launcher.commit()) {
+        fprintf(stderr, "layerling: cannot write %s\n", qPrintable(launcher.fileName()));
+        return 1;
+    }
+
     qputenv("PATH", QFile::encodeName(shimDirectory) + ":" + qgetenv("PATH"));
     qputenv("LAYERLING_URL", Paths::baseUrl().toUtf8());
     qputenv("LAYERLING_MCP_TOKEN", Paths::mcpToken(data).toUtf8());
+    qputenv("LAYERLING_APP", QFile::encodeName(QCoreApplication::applicationFilePath()));
 
     // Hand stdin and stdout straight to the script: the MCP client talks to it.
     const QByteArray nodePath = QFile::encodeName(node), scriptPath = QFile::encodeName(script);
-    char *const arguments[] = {const_cast<char *>(nodePath.constData()), const_cast<char *>(scriptPath.constData()),
-                               nullptr};
+    const QByteArray preload = QUrl::fromLocalFile(launcher.fileName()).toEncoded();
+    char *const arguments[] = {const_cast<char *>(nodePath.constData()), const_cast<char *>("--import"),
+                               const_cast<char *>(preload.constData()),
+                               const_cast<char *>(scriptPath.constData()), nullptr};
     execv(nodePath.constData(), arguments);
     fprintf(stderr, "layerling: could not start %s: %s\n", nodePath.constData(), strerror(errno));
     return 1;
