@@ -81,8 +81,19 @@ bin/test      # tests, offscreen
 `build/layerling` finds `build/runtime` beside it. `LAYERLING_DATA`,
 `LAYERLING_RUNTIME`, and `LAYERLING_NODE` point it elsewhere.
 
-To update layerling, change `pkgver` and `sha256sums` in `pkgbuild/PKGBUILD`,
-then run `bin/install`.
+## Updating
+
+```sh
+bin/update          # build and install the newest layerling release, if newer
+bin/update --check  # only report (exit 10 when an update exists)
+```
+
+To have `omarchy update` do it, add a post-update hook:
+
+```sh
+printf '#!/bin/bash\n"%s/bin/update" || true\n' "$PWD" > /tmp/update-layerling.hook
+omarchy hook install post-update /tmp/update-layerling.hook
+```
 
 ## License
 
