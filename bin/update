@@ -1,0 +1,30 @@
+#!/bin/bash
+# Rebuild and install layerling when upstream has a newer release tag.
+# Usage: bin/update [--check]   (--check only reports, exit 10 if an update exists)
+set -euo pipefail
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+PKGBUILD="$ROOT/pkgbuild/PKGBUILD"
+REPO=https://github.com/henmedia/layerling
+
+latest=$(git ls-remote --tags --refs "$REPO" 'v*' | awk -F/ '{print $NF}' | sed 's/^v//' | sort -V | tail -1)
+[[ -n $latest ]] || { echo "layerling: could not read upstream tags" >&2; exit 1; }
+
+installed=$(pacman -Q layerling 2>/dev/null | awk '{print $2}' | sed 's/-[0-9]*$//' || true)
+
+if [[ -n $installed && $(vercmp "$latest" "$installed") -le 0 ]]; then
+  echo "layerling $installed is up to date"
+  exit 0
+fi
+
+echo "layerling: ${installed:-not installed} -> $latest"
+[[ ${1:-} == --check ]] && exit 10
+
+sed -i -e "s/^pkgver=.*/pkgver=$latest/" -e "s/^pkgrel=.*/pkgrel=1/" "$PKGBUILD"
+cd "$ROOT/pkgbuild"
+updpkgsums
+makepkg -fsi --noconfirm
+
+# Drop old release tarballs and packages
+find . -maxdepth 1 \( -name 'layerling-*.tar.gz' -o -name 'layerling-*.pkg.tar.zst' \) \
+  ! -name "layerling-$latest*" -delete
