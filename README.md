@@ -49,6 +49,33 @@ agent needs an editor it opens one in the app (starting it if needed), not in
 a web browser. `layerling skill install` puts layerling's agent skill in
 `~/.claude/skills`, with setup steps for this app.
 
+## Slicing with OrcaSlicer
+
+The editor has an **OrcaSlicer** panel in its bottom left corner (fold it
+with ▾) for [OrcaSlicer](https://github.com/OrcaSlicer/OrcaSlicer), which has to
+be installed. Pick a printer, a process and a filament from your Orca presets,
+then:
+
+- **Slice** slices the design in the background and shows the print time,
+  filament (grams and metres), cost and layer count, with Orca's warnings.
+  Orca does not need to be open.
+- **Open in Orca** opens a new Orca window with a project: the design on the
+  plate and the presets you picked, ready to slice and print. An Orca window
+  that is already open is left as it is.
+
+Both run Orca's own command line against its settings in
+`~/.config/OrcaSlicer`, which it reads and never writes. Projects are kept in
+`~/.local/share/layerling/orca/projects` (the last 20).
+
+Only presets you saved yourself in Orca are listed: the command line resolves
+their parent presets, but has no file for Orca's built-in ones. To use a
+built-in preset, open it in Orca, save it under your own name, and press ⟳ in
+the panel.
+
+The panel is a patch on layerling's release (`patches/`), applied when the
+package is built. If a newer release no longer takes it, the build says so and
+installs without the panel until the patch is updated.
+
 ## Keys
 
 The editor owns the keyboard (Shift+F1 shows layerling's help, Ctrl+K its
