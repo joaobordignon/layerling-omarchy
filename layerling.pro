@@ -1,4 +1,4 @@
-QT += core gui qml quick quickcontrols2 dbus network webenginequick
+QT += core gui qml quick quickcontrols2 dbus network webenginequick webchannel webchannelquick
 
 CONFIG += c++17 release
 TARGET = layerling
@@ -13,6 +13,7 @@ HEADERS += \
     src/cli.h \
     src/files.h \
     src/instance.h \
+    src/orcabridge.h \
     src/paths.h \
     src/theme.h \
     src/translator.h
@@ -23,6 +24,7 @@ SOURCES += \
     src/cli.cpp \
     src/files.cpp \
     src/instance.cpp \
+    src/orcabridge.cpp \
     src/paths.cpp \
     src/theme.cpp \
     src/translator.cpp

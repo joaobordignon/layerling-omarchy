@@ -1,6 +1,6 @@
 pkgname=layerling
-pkgver=1.162.0
-pkgrel=1
+pkgver=1.175.0
+pkgrel=3
 pkgdesc='Easy 3D CAD for 3D printing, as an Omarchy app'
 arch=('x86_64' 'aarch64')
 url='https://github.com/henmedia/layerling'
@@ -9,7 +9,24 @@ depends=('nodejs' 'qt6-base' 'qt6-declarative' 'qt6-webengine' 'qt6-wayland' 'xd
 makedepends=('npm' 'gcc' 'make')
 options=('!debug')
 source=("layerling-$pkgver.tar.gz::https://github.com/henmedia/layerling/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('7044c2d7be81653940f8b646d46f51680d58cb952002219dfb785154de814282')
+sha256sums=('66b61f9f74e6e398fb9f3844918b4afab8600e9b3df365bd00b8072d015385a5')
+
+prepare() {
+  # Local patches on top of the release (patches/*.patch). One that no longer
+  # applies to a newer release is skipped with a warning, so bin/update keeps
+  # working; the app then just lacks that change until the patch is redone.
+  cd "$srcdir/layerling-$pkgver"
+  local patch
+  for patch in "$startdir"/../patches/*.patch; do
+    [ -e "$patch" ] || continue
+    if patch -p1 --forward --dry-run --silent < "$patch" >/dev/null; then
+      patch -p1 --forward --silent < "$patch"
+      echo "Applied ${patch##*/}"
+    else
+      echo "WARNING: ${patch##*/} does not apply to layerling $pkgver, skipped" >&2
+    fi
+  done
+}
 
 build() {
   # The layerling server, built from the release, then the window around it.

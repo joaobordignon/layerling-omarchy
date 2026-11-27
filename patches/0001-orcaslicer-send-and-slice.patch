@@ -1,0 +1,403 @@
+--- a/apps/web/src/components/LayerlingEditor.tsx
++++ b/apps/web/src/components/LayerlingEditor.tsx
+@@ -248,6 +248,8 @@
+ import { NUT_POCKET_SIZE_ORDER, isNutPocketSize, nutPocketFields } from "@/lib/nutPocketSizes";
+ import { importedShapeFromStl } from "@/lib/stlImport";
+ import { exportMeshesToStl } from "@/lib/stlExport";
++import { HostSendButton, type HostExportFormat, type HostExportResult } from "@/components/HostSendButton";
++import { OrcaDesktopPanel } from "@/components/OrcaDesktopPanel";
+ import { exportMeshesTo3mfAsync, THREE_MF_MEDIA_TYPE } from "@/lib/threemfExport";
+ import { importedShapeFromSvg, invalidSvgMeshReason } from "@/lib/svgImport";
+ import { toSvgProjection, toSvgTopEdges, type SvgProjectionLayer } from "@/lib/svgExport";
+@@ -19632,6 +19634,14 @@
+     executeMcpCommandRef.current = executeMcpCommand;
+   }, [executeMcpCommand]);
+ 
++  // An app that frames the editor (a slicer's plugin tab) takes the design as the export window writes it.
++  const exportForHost = useCallback(async (format: HostExportFormat): Promise<HostExportResult> => {
++    const run = executeMcpCommandRef.current;
++    if (!run) throw new Error("The editor is still starting");
++    const result = await run({ id: `host-${Date.now()}`, action: "export_mesh", params: { format }, createdAt: Date.now() }) as HostExportResult;
++    return result;
++  }, []);
++
+   useEffect(() => {
+     if (typeof window === "undefined") {
+       return;
+@@ -23463,6 +23473,8 @@
+       <pre data-codex-summary hidden>
+         {compactDebugState}
+       </pre>
++      <HostSendButton exportModel={exportForHost} />
++      <OrcaDesktopPanel exportModel={exportForHost} />
+     </div>
+   );
+ }
+--- /dev/null
++++ b/apps/web/src/components/HostSendButton.tsx
+@@ -0,0 +1,123 @@
++"use client";
++
++import { useCallback, useEffect, useRef, useState } from "react";
++
++/**
++ * Embedding hosts (protocol v1): an app that shows the editor in an iframe,
++ * such as a slicer's plugin tab, can take the design straight from it instead
++ * of the user exporting a file and importing it again.
++ *
++ * Only the window that frames this page is listened to, and nothing is sent
++ * until it has said who it is:
++ *
++ *   editor -> host   { type: "layerling:hello", version }            on mount, so a host that loaded first hears it
++ *   host -> editor   { type: "layerling:host", version, name, format? }   "OrcaSlicer", format "3mf" | "stl"
++ *   editor -> host   { type: "layerling:ready", version }
++ *   host -> editor   { type: "layerling:request-model", requestId?, format? }   the host's own button, if it has one
++ *   editor -> host   { type: "layerling:model", version, requestId?, fileName, format, bytes, base64 }
++ *   editor -> host   { type: "layerling:error", version, requestId?, message }
++ *
++ * Once a host has introduced itself the editor shows a "Send to <name>" button;
++ * the file is the one the export window writes (export_mesh).
++ */
++export const HOST_PROTOCOL_VERSION = 1;
++
++export type HostExportFormat = "3mf" | "stl";
++export type HostExportResult = { fileName: string; format: string; bytes: number; base64: string };
++
++type Host = { name: string; format: HostExportFormat; origin: string };
++type Phase = { kind: "idle" } | { kind: "sending" } | { kind: "sent" } | { kind: "failed"; message: string };
++
++const HOST_NAME_MAX = 40;
++
++function framingWindow(): Window | null {
++  if (typeof window === "undefined" || window.parent === window) return null;
++  return window.parent;
++}
++
++export function HostSendButton({ exportModel }: { exportModel: (format: HostExportFormat) => Promise<HostExportResult> }) {
++  const [host, setHost] = useState<Host | null>(null);
++  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
++  const hostRef = useRef<Host | null>(null);
++  const exportRef = useRef(exportModel);
++  exportRef.current = exportModel;
++
++  const post = useCallback((message: Record<string, unknown>) => {
++    const parent = framingWindow();
++    const current = hostRef.current;
++    if (!parent || !current) return;
++    // A host page built from a string (a plugin tab) has the opaque origin "null", which postMessage cannot target.
++    parent.postMessage({ ...message, version: HOST_PROTOCOL_VERSION }, current.origin === "null" ? "*" : current.origin);
++  }, []);
++
++  const send = useCallback(async (format?: HostExportFormat, requestId?: unknown) => {
++    const current = hostRef.current;
++    if (!current) return;
++    setPhase({ kind: "sending" });
++    try {
++      const result = await exportRef.current(format ?? current.format);
++      post({ type: "layerling:model", requestId, fileName: result.fileName, format: result.format, bytes: result.bytes, base64: result.base64 });
++      setPhase({ kind: "sent" });
++    } catch (error) {
++      const message = error instanceof Error ? error.message : String(error);
++      post({ type: "layerling:error", requestId, message });
++      setPhase({ kind: "failed", message });
++    }
++  }, [post]);
++
++  useEffect(() => {
++    const parent = framingWindow();
++    if (!parent) return;
++    const onMessage = (event: MessageEvent) => {
++      if (event.source !== parent || !event.data || typeof event.data !== "object") return;
++      const data = event.data as Record<string, unknown>;
++      if (data.type === "layerling:host" && typeof data.name === "string" && data.name.trim()) {
++        const next: Host = {
++          name: data.name.trim().slice(0, HOST_NAME_MAX),
++          format: data.format === "stl" ? "stl" : "3mf",
++          origin: event.origin,
++        };
++        hostRef.current = next;
++        setHost(next);
++        post({ type: "layerling:ready" });
++      } else if (data.type === "layerling:request-model" && hostRef.current) {
++        void send(data.format === "stl" || data.format === "3mf" ? data.format : undefined, data.requestId);
++      }
++    };
++    window.addEventListener("message", onMessage);
++    // Says nothing about the design: only that an editor is here to be introduced to.
++    parent.postMessage({ type: "layerling:hello", version: HOST_PROTOCOL_VERSION }, "*");
++    return () => window.removeEventListener("message", onMessage);
++  }, [post, send]);
++
++  useEffect(() => {
++    if (phase.kind !== "sent" && phase.kind !== "failed") return;
++    const timer = window.setTimeout(() => setPhase({ kind: "idle" }), phase.kind === "sent" ? 2500 : 6000);
++    return () => window.clearTimeout(timer);
++  }, [phase]);
++
++  if (!host) return null;
++  const label = phase.kind === "sending" ? `Sending to ${host.name}…`
++    : phase.kind === "sent" ? `Sent to ${host.name} ✓`
++    : phase.kind === "failed" ? `Not sent: ${phase.message}`
++    : `Send to ${host.name}`;
++  return (
++    <button
++      type="button"
++      className="host-send-button"
++      onClick={() => void send()}
++      disabled={phase.kind === "sending"}
++      title={`Put this design on ${host.name}'s plate (${host.format.toUpperCase()}, as the export window writes it)`}
++      style={{
++        // Bottom left, above the status bar: the inspector panel takes the right side once a shape is selected.
++        position: "fixed", left: 56, bottom: 44, zIndex: 60, maxWidth: "min(420px, calc(100vw - 32px))",
++        padding: "10px 18px", borderRadius: 999, border: "none", cursor: phase.kind === "sending" ? "progress" : "pointer",
++        font: "600 14px/1.2 system-ui, sans-serif", color: "#1a1a1a",
++        background: phase.kind === "failed" ? "#ff8a80" : phase.kind === "sent" ? "#8be28b" : "#ff9f1c",
++        boxShadow: "0 4px 14px rgba(0,0,0,.25)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
++      }}
++    >
++      {label}
++    </button>
++  );
++}
+--- /dev/null
++++ b/apps/web/src/components/OrcaDesktopPanel.tsx
+@@ -0,0 +1,239 @@
++"use client";
++
++import { useCallback, useEffect, useMemo, useState } from "react";
++import type { HostExportFormat, HostExportResult } from "@/components/HostSendButton";
++
++/**
++ * A desktop app around the editor can offer a slicer as window.layerlingDesktop
++ * (the Omarchy app does, for OrcaSlicer). Then this panel lets the user pick
++ * the slicer's printer, process and filament presets, slice in the background
++ * to see time, filament and cost, or open the design as a new slicer project.
++ * In a browser there is no window.layerlingDesktop and nothing is shown.
++ */
++type DesktopResult = { ok: boolean; error?: string; [key: string]: unknown };
++type DesktopRequest = { base64: string; fileName: string; machine: string; process: string; filament: string };
++type LayerlingDesktop = {
++  version: number;
++  slicer: string;
++  presets: () => Promise<DesktopResult>;
++  slice: (request: DesktopRequest) => Promise<DesktopResult>;
++  open: (request: DesktopRequest) => Promise<DesktopResult>;
++};
++type Presets = {
++  machines: string[];
++  processes: string[];
++  filaments: string[];
++  current: { machine?: string; process?: string; filament?: string };
++  orcaFound: boolean;
++};
++type Picks = { machine: string; process: string; filament: string };
++type SliceResult = {
++  time?: string; grams?: number; cost?: number; layers?: number; millimetres?: number;
++  layerHeight?: number; infill?: number; walls?: number; warnings?: string[];
++};
++type Phase =
++  | { kind: "idle" }
++  | { kind: "busy"; what: "slice" | "open" }
++  | { kind: "sliced"; result: SliceResult; at: number }
++  | { kind: "opened" }
++  | { kind: "failed"; message: string };
++
++const PICKS_KEY = "layerling.orcaDesktop.picks";
++const OPEN_KEY = "layerling.orcaDesktop.open";
++
++declare global {
++  interface Window { layerlingDesktop?: LayerlingDesktop }
++}
++
++function readStored<T>(key: string, fallback: T): T {
++  try {
++    const raw = window.localStorage.getItem(key);
++    return raw ? (JSON.parse(raw) as T) : fallback;
++  } catch {
++    return fallback;
++  }
++}
++
++function store(key: string, value: unknown) {
++  try {
++    window.localStorage.setItem(key, JSON.stringify(value));
++  } catch {
++    // A full or blocked storage only forgets the picks.
++  }
++}
++
++function pick(list: string[], ...wanted: (string | undefined)[]) {
++  return wanted.find((name): name is string => Boolean(name && list.includes(name))) ?? list[0] ?? "";
++}
++
++const panelStyle: React.CSSProperties = {
++  position: "fixed", left: 56, bottom: 44, zIndex: 60, width: "min(340px, calc(100vw - 72px))",
++  background: "rgba(24, 20, 16, 0.96)", color: "#f1e6d8", border: "1px solid #5b4a35", borderRadius: 12,
++  boxShadow: "0 8px 24px rgba(0,0,0,.35)", font: "13px/1.4 system-ui, sans-serif", overflow: "hidden",
++};
++const buttonStyle: React.CSSProperties = {
++  flex: 1, padding: "7px 10px", borderRadius: 8, border: "1px solid #6b5940", background: "#2c241b",
++  color: "#f1e6d8", font: "600 13px system-ui, sans-serif", cursor: "pointer",
++};
++const primaryStyle: React.CSSProperties = { ...buttonStyle, background: "#ff9f1c", borderColor: "#ff9f1c", color: "#1a1a1a" };
++const selectStyle: React.CSSProperties = {
++  width: "100%", padding: "4px 6px", borderRadius: 6, border: "1px solid #5b4a35", background: "#1d1813",
++  color: "#f1e6d8", font: "12px system-ui, sans-serif",
++};
++
++export function OrcaDesktopPanel({ exportModel }: { exportModel: (format: HostExportFormat) => Promise<HostExportResult> }) {
++  const [desktop, setDesktop] = useState<LayerlingDesktop | null>(null);
++  const [presets, setPresets] = useState<Presets | null>(null);
++  const [picks, setPicks] = useState<Picks>({ machine: "", process: "", filament: "" });
++  const [open, setOpen] = useState(true);
++  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
++
++  useEffect(() => {
++    const found = () => { if (window.layerlingDesktop) setDesktop(window.layerlingDesktop); };
++    found();
++    setOpen(readStored(OPEN_KEY, true));
++    window.addEventListener("layerling-desktop", found);
++    return () => window.removeEventListener("layerling-desktop", found);
++  }, []);
++
++  const loadPresets = useCallback(async () => {
++    if (!desktop) return;
++    const answer = await desktop.presets();
++    if (!answer.ok) {
++      setPhase({ kind: "failed", message: answer.error ?? "OrcaSlicer presets could not be read" });
++      return;
++    }
++    const next = answer as unknown as Presets;
++    setPresets(next);
++    const saved = readStored<Partial<Picks>>(PICKS_KEY, {});
++    setPicks({
++      machine: pick(next.machines, saved.machine, next.current?.machine),
++      process: pick(next.processes, saved.process, next.current?.process),
++      filament: pick(next.filaments, saved.filament, next.current?.filament),
++    });
++  }, [desktop]);
++
++  useEffect(() => { void loadPresets(); }, [loadPresets]);
++
++  const choose = (key: keyof Picks, value: string) => {
++    const next = { ...picks, [key]: value };
++    setPicks(next);
++    store(PICKS_KEY, next);
++    if (phase.kind === "sliced") setPhase({ kind: "idle" });
++  };
++
++  const toggle = () => {
++    setOpen((current) => {
++      store(OPEN_KEY, !current);
++      return !current;
++    });
++  };
++
++  const run = async (what: "slice" | "open") => {
++    if (!desktop || phase.kind === "busy") return;
++    setPhase({ kind: "busy", what });
++    try {
++      const model = await exportModel("stl");
++      const request = { base64: model.base64, fileName: model.fileName, ...picks };
++      const answer = what === "slice" ? await desktop.slice(request) : await desktop.open(request);
++      if (!answer.ok) setPhase({ kind: "failed", message: answer.error ?? "OrcaSlicer did not answer" });
++      else if (what === "slice") setPhase({ kind: "sliced", result: answer as SliceResult, at: Date.now() });
++      else setPhase({ kind: "opened" });
++    } catch (error) {
++      setPhase({ kind: "failed", message: error instanceof Error ? error.message : String(error) });
++    }
++  };
++
++  const ready = Boolean(presets && picks.machine && picks.process && picks.filament);
++  const missing = useMemo(() => {
++    if (!presets) return "";
++    if (!presets.orcaFound) return "OrcaSlicer is not installed.";
++    const empty = [
++      presets.machines.length ? "" : "printer",
++      presets.processes.length ? "" : "process",
++      presets.filaments.length ? "" : "filament",
++    ].filter(Boolean);
++    return empty.length ? `No ${empty.join(", ")} presets of your own in OrcaSlicer yet: save one there first.` : "";
++  }, [presets]);
++
++  if (!desktop) return null;
++  const busy = phase.kind === "busy";
++
++  if (!open) {
++    return (
++      <button type="button" onClick={toggle} title="OrcaSlicer: slice or open this design"
++        style={{ ...panelStyle, width: "auto", padding: "8px 14px", cursor: "pointer", font: "600 13px system-ui, sans-serif" }}>
++        OrcaSlicer ▸
++      </button>
++    );
++  }
++
++  const row = (label: string, key: keyof Picks, list: string[]) => (
++    <label style={{ display: "grid", gridTemplateColumns: "64px 1fr", alignItems: "center", gap: 8 }}>
++      <span style={{ color: "#bca88f", fontSize: 12 }}>{label}</span>
++      <select style={selectStyle} value={picks[key]} disabled={busy || !list.length} onChange={(event) => choose(key, event.target.value)}>
++        {list.map((name) => <option key={name} value={name}>{name}</option>)}
++      </select>
++    </label>
++  );
++
++  return (
++    <div style={panelStyle} role="region" aria-label="OrcaSlicer">
++      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid #3d3225" }}>
++        <strong style={{ color: "#ff9f1c", flex: 1 }}>OrcaSlicer</strong>
++        <button type="button" onClick={() => void loadPresets()} disabled={busy} title="Read the presets from OrcaSlicer again"
++          style={{ ...buttonStyle, flex: "none", padding: "2px 8px", fontWeight: 400 }}>⟳</button>
++        <button type="button" onClick={toggle} title="Fold the panel"
++          style={{ ...buttonStyle, flex: "none", padding: "2px 8px", fontWeight: 400 }}>▾</button>
++      </div>
++      <div style={{ display: "grid", gap: 6, padding: "10px 12px" }}>
++        {presets ? (
++          <>
++            {row("Printer", "machine", presets.machines)}
++            {row("Process", "process", presets.processes)}
++            {row("Filament", "filament", presets.filaments)}
++          </>
++        ) : <span style={{ color: "#bca88f" }}>Reading OrcaSlicer presets…</span>}
++        {missing ? <span style={{ color: "#ffb07a" }}>{missing}</span> : null}
++        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
++          <button type="button" style={buttonStyle} disabled={busy || !ready} onClick={() => void run("slice")}
++            title="Slice in the background with these presets and show time, filament and cost">
++            {busy && phase.what === "slice" ? "Slicing…" : "Slice"}
++          </button>
++          <button type="button" style={primaryStyle} disabled={busy || !ready} onClick={() => void run("open")}
++            title="Open this design as a new OrcaSlicer project with these presets">
++            {busy && phase.what === "open" ? "Opening…" : "Open in Orca"}
++          </button>
++        </div>
++        <Outcome phase={phase} />
++      </div>
++    </div>
++  );
++}
++
++function Outcome({ phase }: { phase: Phase }) {
++  if (phase.kind === "failed") return <div style={{ color: "#ff8a80" }}>{phase.message}</div>;
++  if (phase.kind === "opened") return <div style={{ color: "#8be28b" }}>Opened in a new OrcaSlicer window.</div>;
++  if (phase.kind !== "sliced") return null;
++  const { result } = phase;
++  const facts = [
++    result.time ? `⏱ ${result.time}` : "",
++    typeof result.grams === "number" ? `${result.grams.toFixed(1)} g` : "",
++    typeof result.millimetres === "number" ? `${(result.millimetres / 1000).toFixed(2)} m` : "",
++    typeof result.cost === "number" && result.cost > 0 ? `cost ${result.cost.toFixed(2)}` : "",
++    typeof result.layers === "number" ? `${result.layers} layers` : "",
++  ].filter(Boolean);
++  const settings = [
++    result.layerHeight ? `${Number(result.layerHeight.toFixed(2))} mm layers` : "",
++    typeof result.walls === "number" && result.walls ? `${result.walls} walls` : "",
++    typeof result.infill === "number" ? `${result.infill}% infill` : "",
++  ].filter(Boolean);
++  return (
++    <div style={{ display: "grid", gap: 2 }}>
++      <div style={{ color: "#8be28b", fontWeight: 600 }}>{facts.join(" · ")}</div>
++      {settings.length ? <div style={{ color: "#bca88f", fontSize: 12 }}>{settings.join(" · ")}</div> : null}
++      {(result.warnings ?? []).map((warning) => <div key={warning} style={{ color: "#ffb07a", fontSize: 12 }}>⚠ {warning}</div>)}
++      <div style={{ color: "#8a7a66", fontSize: 11 }}>For the design as it was at {new Date(phase.at).toLocaleTimeString()}.</div>
++    </div>
++  );
++}

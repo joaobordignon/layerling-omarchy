@@ -16,6 +16,7 @@
 #include "cli.h"
 #include "files.h"
 #include "instance.h"
+#include "orcabridge.h"
 #include "paths.h"
 #include "theme.h"
 #include "translator.h"
@@ -79,6 +80,7 @@ int main(int argc, char *argv[]) {
 
     Backend backend(Paths::runtimeDirectory(), data, Paths::nodeExecutable());
     Files files(&profile, data);
+    OrcaBridge orcaBridge(data);
     QObject::connect(&app, &QCoreApplication::aboutToQuit, &backend, &Backend::stop);
 
     // Lets QML compare backend.state with Backend.Ready.
@@ -92,6 +94,7 @@ int main(int argc, char *argv[]) {
     engine.rootContext()->setContextProperty("files", &files);
     engine.rootContext()->setContextProperty("webProfile", &profile);
     engine.rootContext()->setContextProperty("instance", &instance);
+    engine.rootContext()->setContextProperty("orcaBridge", &orcaBridge);
     engine.load(QUrl("qrc:/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;
